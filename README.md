@@ -8,7 +8,8 @@
 To verify things are set up properly, you can run this:
 ```
 flutter doctor
-=> ...
+=> 
+...
 [✓] Flutter (Channel stable, <version>, on <os>, locale en-US)
 ...
 ```
@@ -48,5 +49,5 @@ At the end of the workshop, please [provide short feedback][feedback-form].
 
 [flutter]: https://flutter.dev/docs/get-started/install
 [clojure-cli-tools]: https://clojure.org/guides/install_clojure
-[feedback-form]: https://forms.gle/efhyPY9t2rimvTRK8
+[feedback-form]: https://forms.gle/iZ8YMfftWdu3MsSPA
 [android-studio]: https://developer.android.com/studio
