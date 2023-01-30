@@ -48,5 +48,5 @@ At the end of the workshop, please [provide short feedback][feedback-form].
 
 [flutter]: https://flutter.dev/docs/get-started/install
 [clojure-cli-tools]: https://clojure.org/guides/install_clojure
-[feedback-form]: https://forms.gle/h6vd1Gd53RAY1emp6
+[feedback-form]: https://forms.gle/efhyPY9t2rimvTRK8
 [android-studio]: https://developer.android.com/studio
