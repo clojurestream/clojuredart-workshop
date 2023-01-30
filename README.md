@@ -1,5 +1,7 @@
 # ClojureDart Workshop
 
+ClojureDart is a Clojure dialect for writing cross-platform native desktop and mobile apps. It allows Clojure devs to reach new client platforms thanks to Flutter. (Flutter is a performant cross-platform GUI library by Google.) By the end of the workshop you will know ClojureDart, Flutter ecosystem and be autonomous to write apps.
+
 ## System Requirements
 
 - [Flutter][flutter] latest
