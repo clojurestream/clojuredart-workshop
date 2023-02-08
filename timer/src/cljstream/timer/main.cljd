@@ -1,0 +1,42 @@
+(ns cljstream.timer.main
+  (:require
+   ["package:flutter/material.dart" :as m]
+   [cljd.flutter :as f]))
+
+(defonce app-state (atom {:status :stopped
+                          :duration (Duration .minutes 3)}))
+
+(defn main []
+  (f/run
+    (m/MaterialApp
+      .home
+      (m/Scaffold
+        .body
+        (m/Center
+          .child
+          (m/Column
+            .mainAxisAlignment m/MainAxisAlignment.center
+            .children
+            [(f/widget
+               :watch [{:keys [stream duration]} app-state
+                       i stream]
+               :let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
+                     s (.-inSeconds rem-duration)
+                     minutes (quot s 60)
+                     s (mod s 60)]
+               (m/Text (str minutes ":" (-> s str (.padLeft 2 "0")))
+                 .style (m/TextStyle .fontWeight m/FontWeight.bold .fontSize 48)))
+             (m/FilledButton
+               .onPressed (fn []
+                            (case (:status @app-state)
+                              :stopped
+                              (swap! app-state assoc
+                                :status :running
+                                :stream (Stream/periodic (Duration .seconds 1) (fn [i] (inc i))))
+                              :running
+                              (swap! app-state assoc :status :stopped :stream nil))
+                            nil)
+               .child
+               (f/widget
+                 :watch [{:keys [status]} app-state]
+                 (m/Text (if (= status :running) "RESET" "START"))))]))))))
