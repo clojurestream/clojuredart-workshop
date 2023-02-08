@@ -3,8 +3,10 @@
    ["package:flutter/material.dart" :as m]
    [cljd.flutter :as f]))
 
-(defonce app-state (atom {:status :stopped
-                          :duration (Duration .seconds 5)}))
+(def init-timer-state {:status :stopped
+                     :duration (Duration .seconds 5)})
+
+(defonce app-state (atom [(atom init-timer-state) (atom init-timer-state)]))
 
 ;; Assignment: what to do when we reach 0:00 ?
 ;; * at 0:00, replace countdown by "Finished!" or "Time's up!"
@@ -15,65 +17,94 @@
 ;; * adapt both onChanged callbacks to reflect the change
 ;; * wrap the 2 dropdownbutton in a Row widget
 
-(defn main []
-  (f/run
-    m/MaterialApp
-    .home
-    m/Scaffold
-    .body
-    m/Center
-    (m/Column .mainAxisAlignment m/MainAxisAlignment.center)
+
+;; Assignment 3 for next time:
+;; * I always want at least one timer
+;; * alternatively displays a message when you have no timers
+
+(defn timer [timer-state]
+  (m/Row
+    .mainAxisAlignment m/MainAxisAlignment.center
     .children
     [(f/widget
-       :watch [{:keys [status stream duration]} app-state
+       :watch [{:keys [status stream duration]} timer-state
                i stream]
        :let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
              s (.-inSeconds rem-duration)
              minutes (quot s 60)
              s (mod s 60)]
-       (m/DropdownButton
-         .value s
-         .icon (m/Icon m/Icons.arrow_downward)
-         .elevation 16
-         .style (m/TextStyle .color m/Colors.deepPurple)
-         .underline (case status
-                      :running nil
-                      (m/Container .height 2 .color m/Colors.deepPurpleAccent))
-         .onChanged (case status
-                      :running nil
-                      (fn [value]
-                        (swap! app-state assoc :duration (Duration .seconds value))))
-         .items (into [] (map #(m/DropdownMenuItem .value % .child (m/Text (.padLeft (str %) 2 "0")))) (range 60))))
+       (case status
+         :done (m/Text "Time's up!" .style (m/TextStyle .fontWeight m/FontWeight.bold .fontSize 22))
+         (m/Row
+           .mainAxisAlignment m/MainAxisAlignment.center
+           .children
+           [(m/DropdownButton
+              .value minutes
+              .icon (m/Icon m/Icons.arrow_downward)
+              .elevation 16
+              .underline (case status
+                           :running nil
+                           (m/Container .height 2 .color m/Colors.deepPurpleAccent))
+              .onChanged (case status
+                           :running nil
+                           (fn [value]
+                             (swap! timer-state assoc :duration (Duration .minutes value .seconds s))))
+              .items (into [] (map #(m/DropdownMenuItem .value % .child (m/Text (.padLeft (str %) 2 "0")))) (range 15)))
+            (m/SizedBox .width 12)
+            (m/DropdownButton
+              .value s
+              .icon (m/Icon m/Icons.arrow_downward)
+              .elevation 16
+              .underline (case status
+                           :running nil
+                           (m/Container .height 2 .color m/Colors.deepPurpleAccent))
+              .onChanged (case status
+                           :running nil
+                           (fn [value]
+                             (swap! timer-state assoc :duration (Duration .minutes minutes .seconds value))))
+              .items (into [] (map #(m/DropdownMenuItem .value % .child
+                                      (m/Text (.padLeft (str %) 2 "0")))) (range 60)))])))
      (f/widget
-       :watch [{:keys [status stream duration]} app-state
-               i stream]
-       (m/Text
-         (case status
-           :done "Time's up!"
-           (let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
-                 s (.-inSeconds rem-duration)
-                 minutes (quot s 60)
-                 s (mod s 60)]
-             (str minutes ":" (-> s str (.padLeft 2 "0")))))
-         .style (m/TextStyle .fontWeight m/FontWeight.bold .fontSize 48)))
-     (f/widget
+       (m/Padding .padding (m/EdgeInsets.only .left 12))
        (m/FilledButton
          .onPressed (fn []
-                      (case (:status @app-state)
-                        :done (swap! app-state assoc :status :stopped)
+                      (case (:status @timer-state)
+                        :done (swap! timer-state assoc :status :stopped)
                         :stopped
-                        (swap! app-state assoc
+                        (swap! timer-state assoc
                           :status :running
                           :stream (-> (Stream/periodic (Duration .seconds 1)
                                         (fn [i]
-                                          (let [to-go (.-inSeconds (:duration @app-state))
+                                          (let [to-go (.-inSeconds (:duration @timer-state))
                                                 elapsed (inc i)]
                                             (when (= to-go elapsed)
-                                              (swap! app-state assoc :stream nil :status :done))
-                                            elapsed)))
-                                    .asBroadcastStream))
+                                              (swap! timer-state assoc :stream nil :status :done))
+                                            elapsed)))))
                         :running
-                        (swap! app-state assoc :status :stopped :stream nil))
+                        (swap! timer-state assoc :status :stopped :stream nil))
                       nil))
-       :watch [{:keys [status]} app-state]
+       :watch [{:keys [status]} timer-state]
        (m/Text (case status :running "RESET" :stopped "START" :done "DONE")))]))
+
+(defn main []
+  (f/run
+    m/MaterialApp
+    .home
+    (m/Scaffold .floatingActionButton (m/FloatingActionButton
+                                        .onPressed (fn []
+                                                     (swap! app-state conj (atom init-timer-state)))
+                                        .child (m/Icon m/Icons.add)))
+    .body
+    m/Center
+    :watch [as app-state]
+    (m/ListView .shrinkWrap true)
+    .children
+    (into [] (map-indexed (fn [idx st]
+                            (m/Dismissible
+                              .key (m/ValueKey st)
+                              .child (timer st)
+                              .onDismissed
+                              (fn [_]
+                                (swap! app-state
+                                  (fn [s]
+                                    (into (subvec s 0 idx) (subvec s (inc idx))))))))) as)))
