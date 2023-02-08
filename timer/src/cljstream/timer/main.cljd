@@ -4,11 +4,16 @@
    [cljd.flutter :as f]))
 
 (defonce app-state (atom {:status :stopped
-                          :duration (Duration .seconds 3)}))
+                          :duration (Duration .seconds 5)}))
 
 ;; Assignment: what to do when we reach 0:00 ?
 ;; * at 0:00, replace countdown by "Finished!" or "Time's up!"
 ;; * change button label to "DONE"
+
+;; Assignment 2:
+;; * create a new dropdownbutton for handling minutes
+;; * adapt both onChanged callbacks to reflect the change
+;; * wrap the 2 dropdownbutton in a Row widget
 
 (defn main []
   (f/run
@@ -20,6 +25,26 @@
     (m/Column .mainAxisAlignment m/MainAxisAlignment.center)
     .children
     [(f/widget
+       :watch [{:keys [status stream duration]} app-state
+               i stream]
+       :let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
+             s (.-inSeconds rem-duration)
+             minutes (quot s 60)
+             s (mod s 60)]
+       (m/DropdownButton
+         .value s
+         .icon (m/Icon m/Icons.arrow_downward)
+         .elevation 16
+         .style (m/TextStyle .color m/Colors.deepPurple)
+         .underline (case status
+                      :running nil
+                      (m/Container .height 2 .color m/Colors.deepPurpleAccent))
+         .onChanged (case status
+                      :running nil
+                      (fn [value]
+                        (swap! app-state assoc :duration (Duration .seconds value))))
+         .items (into [] (map #(m/DropdownMenuItem .value % .child (m/Text (.padLeft (str %) 2 "0")))) (range 60))))
+     (f/widget
        :watch [{:keys [status stream duration]} app-state
                i stream]
        (m/Text
@@ -39,13 +64,14 @@
                         :stopped
                         (swap! app-state assoc
                           :status :running
-                          :stream (Stream/periodic (Duration .seconds 1)
-                                    (fn [i]
-                                      (let [to-go (.-inSeconds (:duration @app-state))
-                                            elapsed (inc i)]
-                                        (when (= to-go elapsed)
-                                          (swap! app-state assoc :stream nil :status :done))
-                                        elapsed))))
+                          :stream (-> (Stream/periodic (Duration .seconds 1)
+                                        (fn [i]
+                                          (let [to-go (.-inSeconds (:duration @app-state))
+                                                elapsed (inc i)]
+                                            (when (= to-go elapsed)
+                                              (swap! app-state assoc :stream nil :status :done))
+                                            elapsed)))
+                                    .asBroadcastStream))
                         :running
                         (swap! app-state assoc :status :stopped :stream nil))
                       nil))
