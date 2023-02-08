@@ -4,39 +4,50 @@
    [cljd.flutter :as f]))
 
 (defonce app-state (atom {:status :stopped
-                          :duration (Duration .minutes 3)}))
+                          :duration (Duration .seconds 3)}))
+
+;; Assignment: what to do when we reach 0:00 ?
+;; * at 0:00, replace countdown by "Finished!" or "Time's up!"
+;; * change button label to "DONE"
 
 (defn main []
   (f/run
-    (m/MaterialApp
-      .home
-      (m/Scaffold
-        .body
-        (m/Center
-          .child
-          (m/Column
-            .mainAxisAlignment m/MainAxisAlignment.center
-            .children
-            [(f/widget
-               :watch [{:keys [stream duration]} app-state
-                       i stream]
-               :let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
-                     s (.-inSeconds rem-duration)
-                     minutes (quot s 60)
-                     s (mod s 60)]
-               (m/Text (str minutes ":" (-> s str (.padLeft 2 "0")))
-                 .style (m/TextStyle .fontWeight m/FontWeight.bold .fontSize 48)))
-             (m/FilledButton
-               .onPressed (fn []
-                            (case (:status @app-state)
-                              :stopped
-                              (swap! app-state assoc
-                                :status :running
-                                :stream (Stream/periodic (Duration .seconds 1) (fn [i] (inc i))))
-                              :running
-                              (swap! app-state assoc :status :stopped :stream nil))
-                            nil)
-               .child
-               (f/widget
-                 :watch [{:keys [status]} app-state]
-                 (m/Text (if (= status :running) "RESET" "START"))))]))))))
+    m/MaterialApp
+    .home
+    m/Scaffold
+    .body
+    m/Center
+    (m/Column .mainAxisAlignment m/MainAxisAlignment.center)
+    .children
+    [(f/widget
+       :watch [{:keys [status stream duration]} app-state
+               i stream]
+       (m/Text
+         (case status
+           :done "Time's up!"
+           (let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
+                 s (.-inSeconds rem-duration)
+                 minutes (quot s 60)
+                 s (mod s 60)]
+             (str minutes ":" (-> s str (.padLeft 2 "0")))))
+         .style (m/TextStyle .fontWeight m/FontWeight.bold .fontSize 48)))
+     (f/widget
+       (m/FilledButton
+         .onPressed (fn []
+                      (case (:status @app-state)
+                        :done (swap! app-state assoc :status :stopped)
+                        :stopped
+                        (swap! app-state assoc
+                          :status :running
+                          :stream (Stream/periodic (Duration .seconds 1)
+                                    (fn [i]
+                                      (let [to-go (.-inSeconds (:duration @app-state))
+                                            elapsed (inc i)]
+                                        (when (= to-go elapsed)
+                                          (swap! app-state assoc :stream nil :status :done))
+                                        elapsed))))
+                        :running
+                        (swap! app-state assoc :status :stopped :stream nil))
+                      nil))
+       :watch [{:keys [status]} app-state]
+       (m/Text (case status :running "RESET" :stopped "START" :done "DONE")))]))
