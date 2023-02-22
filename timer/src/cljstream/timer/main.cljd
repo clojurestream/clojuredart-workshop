@@ -22,11 +22,37 @@
 ;; * I always want at least one timer
 ;; * alternatively displays a message when you have no timers
 
-(defn timer [timer-state]
+
+(def filled-button
+  (f/widget
+    (m/Padding .padding (m/EdgeInsets.only .left 12))
+    :get {timer-state :timer-state} #_[:timer-state] ; timer-state
+    (m/FilledButton
+      .onPressed (fn []
+                   (case (:status @timer-state)
+                     :done (swap! timer-state assoc :status :stopped)
+                     :stopped
+                     (swap! timer-state assoc
+                       :status :running
+                       :stream (-> (Stream/periodic (Duration .seconds 1)
+                                     (fn [i]
+                                       (let [to-go (.-inSeconds (:duration @timer-state))
+                                             elapsed (inc i)]
+                                         (when (= to-go elapsed)
+                                           (swap! timer-state assoc :stream nil :status :done))
+                                         elapsed)))))
+                     :running
+                     (swap! timer-state assoc :status :stopped :stream nil))
+                   nil))
+    :watch [{:keys [status]} timer-state]
+    (m/Text (case status :running "RESET" :stopped "START" :done "DONE"))))
+
+(def timer #_[timer-state]
   (m/Row
     .mainAxisAlignment m/MainAxisAlignment.center
     .children
     [(f/widget
+       :get {timer-state :timer-state} #_[:timer-state] ; timer-state
        :watch [{:keys [status stream duration]} timer-state
                i stream]
        :let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
@@ -64,27 +90,7 @@
                              (swap! timer-state assoc :duration (Duration .minutes minutes .seconds value))))
               .items (into [] (map #(m/DropdownMenuItem .value % .child
                                       (m/Text (.padLeft (str %) 2 "0")))) (range 60)))])))
-     (f/widget
-       (m/Padding .padding (m/EdgeInsets.only .left 12))
-       (m/FilledButton
-         .onPressed (fn []
-                      (case (:status @timer-state)
-                        :done (swap! timer-state assoc :status :stopped)
-                        :stopped
-                        (swap! timer-state assoc
-                          :status :running
-                          :stream (-> (Stream/periodic (Duration .seconds 1)
-                                        (fn [i]
-                                          (let [to-go (.-inSeconds (:duration @timer-state))
-                                                elapsed (inc i)]
-                                            (when (= to-go elapsed)
-                                              (swap! timer-state assoc :stream nil :status :done))
-                                            elapsed)))))
-                        :running
-                        (swap! timer-state assoc :status :stopped :stream nil))
-                      nil))
-       :watch [{:keys [status]} timer-state]
-       (m/Text (case status :running "RESET" :stopped "START" :done "DONE")))]))
+     filled-button]))
 
 (defn main []
   (f/run
@@ -97,8 +103,9 @@
     .body
     m/Center
     :watch [as app-state]
-    :get [m/ScaffoldMessenger] ; scaffold-messenger
-    ; :get to read a value
+    :get {sm m/ScaffoldMessenger} #_[m/ScaffoldMessenger] ; scaffold-messenger
+    ; :let [scaffold-messenger (m/ScaffoldMessenger.of context)]
+    ; :get to read a value :get -> (Object.of ctx)
     ; :bind to set a value
     (m/ListView .shrinkWrap true)
     .children
@@ -110,11 +117,14 @@
                                      (if (some? (next @app-state))
                                        (future true) #_(Future.value true)
                                        (do
-                                         (.showSnackBar scaffold-messenger
+                                         (.showSnackBar sm #_scaffold-messenger
                                            (m/SnackBar .content (m/Text "Can't remove the last timer!")))
                                          (future false))))
                    .onDismissed (fn [_]
                                   (swap! app-state #(into [] (remove #{state}) %))
                                   #_(reset! app-state (into [] (remove #{state}) @app-state)))
                    .child
-                   (timer state)))) as)))
+                   (f/widget
+                     :bind {:timer-state state}
+                     #_(timer state)
+                     timer)))) as)))
