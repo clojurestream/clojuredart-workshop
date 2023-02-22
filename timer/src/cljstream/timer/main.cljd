@@ -1,6 +1,8 @@
 (ns cljstream.timer.main
   (:require
+   ["dart:convert" :as convert]
    ["package:flutter/material.dart" :as m]
+   ["package:http/http.dart" :as http]
    [cljd.flutter :as f]))
 
 (def init-timer-state {:status :stopped
@@ -71,6 +73,7 @@
            .mainAxisAlignment m/MainAxisAlignment.center
            .children
            [(f/widget :watch [minutes minutes]
+              :let [_ (dart:core/print minutes)]
               (m/DropdownButton
                 .value minutes
                 .icon (m/Icon m/Icons.arrow_downward)
@@ -105,7 +108,7 @@
                                         (m/Text (.padLeft (str %) 2 "0")))) (range 60))))])))
      filled-button]))
 
-(defn main []
+#_(defn main []
   (f/run
     m/MaterialApp
     .home
@@ -141,3 +144,62 @@
                      :bind {:timer-state state}
                      #_(timer state)
                      timer)))) as)))
+
+(defn main []
+  (f/run
+    :let [path "https://jsonplaceholder.typicode.com/posts/1"]
+    m/MaterialApp
+    .home
+    (m/Scaffold .floatingActionButton (m/FloatingActionButton
+                                        .onPressed (fn []
+                                                     (swap! app-state conj (atom init-timer-state)))
+                                        .child (m/Icon m/Icons.add)))
+    .body
+    m/Center
+    :watch [#_{body .-body sc .-statusCode :as response}
+            {:flds [body statucCode]}
+            (Future.delayed (Duration .seconds 2)
+              (fn [] (http/get (Uri.parse path))))
+            #_(http/get (Uri.parse path))]
+    (if response
+      (if (= sc 200)
+        (m/Text (get (convert/jsonDecode body) "title")
+          #_(:title
+             (into {}
+               (map (fn [[k v]] [(keyword k) v]))
+               (convert/jsonDecode (.-body response)))))
+        (m/Text "Shit happened!"))
+      (m/CircularProgressIndicator))))
+
+(defn get-resource [] ;; going to return a Future because await was used
+  (let [response (await (http/get (Uri/parse "https://jsonplaceholder.typicode.com/albums/1")))]
+    (.-body response)
+    (if-some [{body .-body sc .-statusCode} response]
+      (get (convert/json.decode body) "title")
+      "not yet")))
+
+;;  clj -M:cljd clean
+;;  flutter clean
+;;  clj -M:cljd compile
+;;  (if apple developer account is configured) ->> https://docs.flutter.dev/deployment/ios
+;;  flutter build ipa
+
+;; import 'dart:convert' as convert;
+
+;; void main(List<String> arguments) async {
+;;   // This example uses the Google Books API to search for books about http.
+;;   // https://developers.google.com/books/docs/overview
+;;   var url =
+;;       Uri.https('www.googleapis.com', '/books/v1/volumes', {'q': '{http}'});
+
+;;   // Await the http get response, then decode the json-formatted response.
+;;   var response = await http.get(url);
+;;   if (response.statusCode == 200) {
+;;     var jsonResponse =
+;;         convert.jsonDecode(response.body) as Map<String, dynamic>;
+;;     var itemCount = jsonResponse['totalItems'];
+;;     print('Number of books about http: $itemCount.');
+;;   } else {
+;;     print('Request failed with status: ${response.statusCode}.');
+;;   }
+;; }
