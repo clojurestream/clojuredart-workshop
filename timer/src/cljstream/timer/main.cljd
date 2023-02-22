@@ -54,42 +54,55 @@
     [(f/widget
        :get {timer-state :timer-state} #_[:timer-state] ; timer-state
        :watch [{:keys [status stream duration]} timer-state
-               i stream]
-       :let [rem-duration (. duration "-" (Duration .seconds (or i 0)))
-             s (.-inSeconds rem-duration)
-             minutes (quot s 60)
-             s (mod s 60)]
+               #_#_i stream]
+       ;; A B C
+       ;; D = IF A B C
+       ; [a atom-a
+       ;  b atom-b
+       ;  c atom-c
+       ;  d (f/$ (if (f/<! a) (f/<! b) (f/<! c))
+       :let [rem-duration (f/$ (. duration "-" (Duration .seconds (or (f/<! stream) 0))))
+             s (f/$ (.-inSeconds (f/<! rem-duration)))
+             minutes (f/$ (quot (f/<! s) 60))
+             s' (f/$ (mod (f/<! s) 60))]
        (case status
          :done (m/Text "Time's up!" .style (m/TextStyle .fontWeight m/FontWeight.bold .fontSize 22))
          (m/Row
            .mainAxisAlignment m/MainAxisAlignment.center
            .children
-           [(m/DropdownButton
-              .value minutes
-              .icon (m/Icon m/Icons.arrow_downward)
-              .elevation 16
-              .underline (case status
-                           :running nil
-                           (m/Container .height 2 .color m/Colors.deepPurpleAccent))
-              .onChanged (case status
-                           :running nil
-                           (fn [value]
-                             (swap! timer-state assoc :duration (Duration .minutes value .seconds s))))
-              .items (into [] (map #(m/DropdownMenuItem .value % .child (m/Text (.padLeft (str %) 2 "0")))) (range 15)))
+           [(f/widget :watch [minutes minutes]
+              (m/DropdownButton
+                .value minutes
+                .icon (m/Icon m/Icons.arrow_downward)
+                .elevation 16
+                .underline (case status
+                             :running nil
+                             (m/Container .height 2 .color m/Colors.deepPurpleAccent))
+                .onChanged (case status
+                             :running nil
+                             (fn [value]
+                               (swap! timer-state assoc :duration
+                                 (Duration
+                                   .minutes value
+                                   .seconds (mod (.-inSeconds duration) 60)))))
+                .items (into [] (map #(m/DropdownMenuItem .value % .child (m/Text (.padLeft (str %) 2 "0")))) (range 15))))
             (m/SizedBox .width 12)
-            (m/DropdownButton
-              .value s
-              .icon (m/Icon m/Icons.arrow_downward)
-              .elevation 16
-              .underline (case status
-                           :running nil
-                           (m/Container .height 2 .color m/Colors.deepPurpleAccent))
-              .onChanged (case status
-                           :running nil
-                           (fn [value]
-                             (swap! timer-state assoc :duration (Duration .minutes minutes .seconds value))))
-              .items (into [] (map #(m/DropdownMenuItem .value % .child
-                                      (m/Text (.padLeft (str %) 2 "0")))) (range 60)))])))
+            (f/widget :watch [s' s']
+              (m/DropdownButton
+                .value s'
+                .icon (m/Icon m/Icons.arrow_downward)
+                .elevation 16
+                .underline (case status
+                             :running nil
+                             (m/Container .height 2 .color m/Colors.deepPurpleAccent))
+                .onChanged (case status
+                             :running nil
+                             (fn [value]
+                               (swap! timer-state assoc :duration (Duration
+                                                                    .minutes (.-inMinutes duration)
+                                                                    .seconds value))))
+                .items (into [] (map #(m/DropdownMenuItem .value % .child
+                                        (m/Text (.padLeft (str %) 2 "0")))) (range 60))))])))
      filled-button]))
 
 (defn main []
