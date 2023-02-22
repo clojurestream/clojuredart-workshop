@@ -97,14 +97,24 @@
     .body
     m/Center
     :watch [as app-state]
+    :get [m/ScaffoldMessenger] ; scaffold-messenger
+    ; :get to read a value
+    ; :bind to set a value
     (m/ListView .shrinkWrap true)
     .children
-    (into [] (map-indexed (fn [idx st]
-                            (m/Dismissible
-                              .key (m/ValueKey st)
-                              .child (timer st)
-                              .onDismissed
-                              (fn [_]
-                                (swap! app-state
-                                  (fn [s]
-                                    (into (subvec s 0 idx) (subvec s (inc idx))))))))) as)))
+    (into [] (map
+               (fn [state]
+                 (m/Dismissible
+                   .key (m/ValueKey state)
+                   .confirmDismiss (fn [_]
+                                     (if (some? (next @app-state))
+                                       (future true) #_(Future.value true)
+                                       (do
+                                         (.showSnackBar scaffold-messenger
+                                           (m/SnackBar .content (m/Text "Can't remove the last timer!")))
+                                         (future false))))
+                   .onDismissed (fn [_]
+                                  (swap! app-state #(into [] (remove #{state}) %))
+                                  #_(reset! app-state (into [] (remove #{state}) @app-state)))
+                   .child
+                   (timer state)))) as)))
