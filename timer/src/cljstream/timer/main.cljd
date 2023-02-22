@@ -145,7 +145,7 @@
                      #_(timer state)
                      timer)))) as)))
 
-(defn main []
+#_(defn main []
   (f/run
     :let [path "https://jsonplaceholder.typicode.com/posts/1"]
     m/MaterialApp
@@ -186,3 +186,31 @@
 
 ;;  To open Xcode
 ;;  open ios/Runner.xcworkspace
+
+(defn main []
+  (f/run
+    :let [state (atom {:width 50
+                       :height 50
+                       :color m/Colors.green
+                       :border-radius (m/BorderRadius.circular 8)})]
+    m/MaterialApp
+    .home
+    (m/Scaffold
+      .appBar (m/AppBar .title (m/Text "AnimatedContainer demo"))
+      .floatingActionButton
+      (m/FloatingActionButton
+        .onPressed
+        (fn []
+          (reset! state {:width (rand-int 300)
+                         :height (rand-int 300)
+                         :color (m/Color.fromRGBO (rand-int 256) (rand-int 256) (rand-int 256) 1)
+                         :border-radius (m/BorderRadius.circular (rand-int 100))})
+          nil)
+        .child (m/Icon m/Icons.play_arrow)))
+    .body
+    m/Center
+    :watch [{:keys [width height color border-radius]} state]
+    (m/AnimatedContainer .width width .height height
+      .decoration (m/BoxDecoration .color color .borderRadius border-radius)
+      .duration (Duration .seconds 1)
+      .curve m/Curves.fastOutSlowIn)))
